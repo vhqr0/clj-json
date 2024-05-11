@@ -121,6 +121,8 @@
 
 ;; number
 
+(def ^:dynamic *read-bigdec* false)
+
 (defn- read-js-number [s]
   (let [sb (sb-make)
         [s sb] (if (not= (first s) \-)
@@ -158,9 +160,11 @@
                             (if-not (num-char? c)
                               [s sb true]
                               (recur (rest s) (sb-conj-char sb c)))))))]
-    (cond exp? [s (str->bigdec (sb-str sb))]
-          fac? [s (str->float (sb-str sb))]
-          :else [s (str->int (sb-str sb))])))
+    (if *read-bigdec*
+      [s (str->bigdec (sb-str sb))]
+      (cond exp? [s (str->bigdec (sb-str sb))]
+            fac? [s (str->float (sb-str sb))]
+            :else [s (str->int (sb-str sb))]))))
 
 (doseq [c (conj num-chars \-)]
   (defmethod read c [s]
@@ -214,7 +218,7 @@
   (-js-write [this sb]))
 
 (defn write [sb x]
-  (if-not x
+  (if (nil? x)
     (sb-conj-str sb "null")
     (-js-write x sb)))
 
@@ -294,6 +298,11 @@
   nil
   (-js-write [this sb]
     (sb-conj-str sb (str this)))
+
+  #?(:clj Boolean
+     :cljs boolean)
+  (-js-write [this sb]
+    (sb-conj-str sb (if this "true" "false")))
 
   #?(:clj Number
      :cljs number)

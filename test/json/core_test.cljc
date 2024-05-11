@@ -99,7 +99,7 @@
 
 ; from http://www.json.org/JSON_checker/test/pass1.json
 (def pass1-string
-     "[
+  "[
     \"JSON Test Pattern pass1\",
     {\"object with 1 member\":[\"array with 1 element\"]},
     {},
@@ -163,11 +163,7 @@
     (is (= "JSON Test Pattern pass1" (first input)))
     (is (= "array with 1 element" (get-in input [1 "object with 1 member" 0])))
     (is (= 1234567890 (get-in input [8 "integer"])))
-    (is (= "rosebud" (last input)))))
-
-(defn benchmark []
-  (dotimes [_ 8]
-    (time
-     (dotimes [_ 1000]
-       (assert (= (json/read-string pass1-string)
-                  (json/read-string (json/write-string (json/read-string pass1-string)))))))))
+    (is (= "rosebud" (last input))))
+  (is (binding [json/*read-bigdec* true]
+        (= (json/read-string pass1-string)
+           (json/read-string (json/write-string (json/read-string pass1-string)))))))
