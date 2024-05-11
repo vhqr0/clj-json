@@ -28,6 +28,10 @@
   #?(:clj (Double/parseDouble s)
      :cljs (js/parseFloat s)))
 
+(defn- str->bigdec [s]
+  #?(:clj (bigdec s)
+     :cljs (js/parseFloat s)))
+
 (defn- hex->int [h]
   #?(:clj (Long/parseLong h 16)
      :cljs (js/parseInt h 16)))
@@ -89,32 +93,27 @@
 
 ;; string
 
-;; \u_XXXX
-(defn- read-js-hex-char [s]
-  (let [[cs s] (split-at 4 s)]
-    (assert (= (count cs) 4))
-    [s (char (hex->int (apply str cs)))]))
-
-;; \_X
-(defn- read-js-escaped-char [s]
-  (case (char (first s))
-    (\" \\ \/) [(rest s) (first s)]
-    \b [(rest s) \backspace]
-    \f [(rest s) \formfeed]
-    \n [(rest s) \newline]
-    \r [(rest s) \return]
-    \t [(rest s) \tab]
-    \u (read-js-hex-char (rest s))))
-
-;; "_XXX"
 (defn- read-js-string [s]
   (loop [s s sb (sb-make)]
     (let [c (first s)]
       (assert c)
       (case (char c)
         \" [(rest s) (sb-str sb)]
-        \\ (let [[s c] (read-js-escaped-char (rest s))]
-             (recur s (sb-conj-char sb c)))
+        \\ (let [s (rest s)
+                 c (first s)]
+             (assert c)
+             (case (char c)
+               \" (recur (rest s) (sb-conj-char sb \"))
+               \\ (recur (rest s) (sb-conj-char sb \\))
+               \/ (recur (rest s) (sb-conj-char sb \/))
+               \b (recur (rest s) (sb-conj-char sb \backspace))
+               \f (recur (rest s) (sb-conj-char sb \formfeed))
+               \n (recur (rest s) (sb-conj-char sb \newline))
+               \r (recur (rest s) (sb-conj-char sb \return))
+               \t (recur (rest s) (sb-conj-char sb \tab))
+               \u (let [[cs s] (split-at 4 (rest s))]
+                    (assert (= (count cs) 4))
+                    (recur s (sb-conj-char sb (char (hex->int (apply str cs))))))))
         (recur (rest s) (sb-conj-char sb c))))))
 
 (defmethod read \" [s]
@@ -122,31 +121,46 @@
 
 ;; number
 
-;; NOTE: doesn't support e/E in numbers; for clj, parse number by
-;; Long/parseLong and Double/parseDouble, doesn't support big number.
-
-;; _-123 | _0.789
 (defn- read-js-number [s]
   (let [sb (sb-make)
         [s sb] (if (not= (first s) \-)
                  [s sb]
                  [(rest s) (sb-conj-char sb \-)])
-        [s sb] (do (assert (num-char? (first s)))
-                   (if (= (first s) \0)
-                     [(rest s) (sb-conj-char sb \0)]
-                     (loop [s s sb sb]
-                       (if-not (num-char? (first s))
+        [s sb] (let [c (first s)]
+                 (assert (num-char? c))
+                 (if (= c \0)
+                   [(rest s) (sb-conj-char sb \0)]
+                   (loop [s (rest s) sb (sb-conj-char sb c)]
+                     (let [c (first s)]
+                       (if-not (num-char? c)
                          [s sb]
-                         (recur (rest s) (sb-conj-char sb (first s)))))))]
-    (if (not= (first s) \.)
-      [s (str->int (sb-str sb))]
-      (let [s (rest s)
-            sb (sb-conj-char sb \.)]
-        (assert (num-char? (first s)))
-        (loop [s s sb sb]
-          (if-not (num-char? (first s))
-            [s (str->float (sb-str sb))]
-            (recur (rest s) (sb-conj-char sb (first s)))))))))
+                         (recur (rest s) (sb-conj-char sb c)))))))
+        [s sb fac?] (if (not= (first s) \.)
+                      [s sb false]
+                      (let [s (rest s)
+                            c (first s)]
+                        (assert (num-char? c))
+                        (loop [s (rest s)
+                               sb (-> (sb-conj-char sb \.)
+                                      (sb-conj-char c))]
+                          (let [c (first s)]
+                            (if-not (num-char? c)
+                              [s sb true]
+                              (recur (rest s) (sb-conj-char sb c)))))))
+        [s sb exp?] (if-not (let [c (first s)] (or (= c \e) (= c \E)))
+                      [s sb false]
+                      (let [s (rest s)
+                            c (first s)]
+                        (assert (or (= c \-) (= c \+) (num-char? c)))
+                        (loop [s (rest s)
+                               sb (-> (sb-conj-char sb \e) (sb-conj-char c))]
+                          (let [c (first s)]
+                            (if-not (num-char? c)
+                              [s sb true]
+                              (recur (rest s) (sb-conj-char sb c)))))))]
+    (cond exp? [s (str->bigdec (sb-str sb))]
+          fac? [s (str->float (sb-str sb))]
+          :else [s (str->int (sb-str sb))])))
 
 (doseq [c (conj num-chars \-)]
   (defmethod read c [s]
@@ -154,7 +168,6 @@
 
 ;; array
 
-;; [_] | [_ 1, 2, 3]
 (defn- read-js-array [s]
   (let [s (skip-whitespace s)]
     (if (= (first s) \])
@@ -178,7 +191,6 @@
     (assert (string? k))
     [s (*read-keyfn* k)]))
 
-;; {_} | [_ "k1": 1, "k2": "2"]
 (defn- read-js-object [s]
   (let [s (skip-whitespace s)]
     (if (= (first s) \})
