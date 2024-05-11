@@ -5,4 +5,10 @@
             :url "https://www.gnu.org/licenses/gpl-3.0.txt"}
   :dependencies [[org.clojure/clojure "1.12.0-alpha11"]]
   :profiles
-  {:cljs {:dependencies [[thheller/shadow-cljs "2.28.5"]]}})
+  {:cljs {:dependencies [[thheller/shadow-cljs "2.28.5"]]}
+   :perf {:dependencies [[com.clojure-goes-fast/clj-async-profiler "0.5.0"]
+                         [criterium/criterium "0.4.6"]
+                         [org.clojure/data.json "2.5.0"]]
+          :source-paths ["resources"]
+          :jvm-opts ["-Djdk.attach.allowAttachSelf=true"]
+          :repl-options {:init-ns json.perf}}})
