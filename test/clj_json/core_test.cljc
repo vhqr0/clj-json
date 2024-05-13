@@ -1,8 +1,8 @@
-(ns json.core-test
+(ns clj-json.core-test
   (:require #?(:clj [clojure.test :refer :all]
                :cljs [cljs.test :refer [deftest is]])
             [clojure.string :as str]
-            [json.core :as json]))
+            [clj-json.core :as json]))
 
 (deftest read-numbers
   (is (= 42 (json/read-string "42")))

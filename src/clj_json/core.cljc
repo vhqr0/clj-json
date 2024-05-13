@@ -1,4 +1,4 @@
-(ns json.core
+(ns clj-json.core
   (:refer-clojure :exclude [read read-string])
   #?@(:cljs [(:import [goog.string StringBuffer])]))
 

@@ -9,6 +9,6 @@
    :perf {:dependencies [[com.clojure-goes-fast/clj-async-profiler "0.5.0"]
                          [criterium/criterium "0.4.6"]
                          [org.clojure/data.json "2.5.0"]]
-          :source-paths ["resources"]
+          :source-paths ["perf/src"]
           :jvm-opts ["-Djdk.attach.allowAttachSelf=true"]
-          :repl-options {:init-ns json.perf}}})
+          :repl-options {:init-ns clj-json.perf}}})
